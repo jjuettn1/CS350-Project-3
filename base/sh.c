@@ -62,7 +62,7 @@ runcmd(struct cmd *cmd)
   struct execcmd *ecmd;
   //struct listcmd *lcmd;
   //struct pipecmd *pcmd;
-  //struct redircmd *rcmd;
+  struct redircmd *rcmd;
   
   if(cmd == 0)
     exit();
@@ -80,7 +80,14 @@ runcmd(struct cmd *cmd)
     break;
 
   case REDIR:
-    printf(2, "Redirection Not Implemented\n");
+    rcmd = (struct redircmd*)cmd;
+    close(rcmd->fd);
+    int file_open_result = open(rcmd->file, rcmd->mode);
+    if (file_open_result < 0) {
+      printf("Error: Failed to open %s\n", rcmd->file);
+      exit();
+    }
+    runcmd(rcmd->cmd);
     break;
 
   case LIST:
