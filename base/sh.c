@@ -58,7 +58,7 @@ void
 runcmd(struct cmd *cmd)
 {
   //int p[2];
-  //struct backcmd *bcmd;
+  struct backcmd *bcmd;
   struct execcmd *ecmd;
   //struct listcmd *lcmd;
   //struct pipecmd *pcmd;
@@ -92,7 +92,11 @@ runcmd(struct cmd *cmd)
     break;
 
   case BACK:
-    printf(2, "Backgrounding not implemented\n");
+    //printf(2, "Backgrounding not implemented\n");
+    bcmd = (struct backcmd*)cmd;
+    if(fork1() == 0){
+      runcmd(bcmd->cmd);
+    }
     break;
   }
   exit();
