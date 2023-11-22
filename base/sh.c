@@ -13,7 +13,7 @@
 
 #define MAXARGS 10
 
-char* history[10];
+char* history[10] = {0};
 
 struct cmd {
   int type;
@@ -124,20 +124,22 @@ hist(char *buf, int nbuf){
   {
     for(int i = 0; i < 10; i++){
       if((history[i]) != 0){
-      printf(2, "Previous command %d: %s\n", i+1, history[i]);
+      printf(2, "Previous command %d: %s", i+1, history[i]);
       }
     }
     return 1;
   }
-  else if (nbuf == 1)
+  else if (nbuf == 2 || nbuf == 1)
   {
     int val=atoi(buf)-1;
     if(val >= 0 && val < 10){
       if(fork1() == 0){
-      printf(2, "%s\n" , history[val]);
       runcmd(parsecmd(history[val]));
       }
       wait();
+    }
+    else{
+      printf(2, "Error: Only storing 10 previous commands");
     }
     return 1;
   }
@@ -147,11 +149,18 @@ hist(char *buf, int nbuf){
 
 void
 addHist(char *buf){
-  // for (int i = 9; i > 0; i--)
-  // {
-  //   history[i]=history[i-1];
-  // }
-  history[0]=buf;
+  //code to shift values of the history array to update the list with recent commands
+  
+  if(history[9] != 0){
+    free(history[9]);
+  }
+
+    for(int i = 9; i > 0; i--) {
+        history[i] = history[i - 1];
+    }
+    history[0] = malloc(strlen(buf) + 1);
+    strcpy(history[0], buf);
+
 }
 
 int
@@ -170,7 +179,9 @@ main(void)
 
   // Read and run input commands.
   while(getcmd(buf, sizeof(buf)) >= 0){
+  
     if(buf[0] == 'c' && buf[1] == 'd' && buf[2] == ' '){
+      addHist(buf);
       // Chdir must be called by the parent, not the child.
       buf[strlen(buf)-1] = 0;  // chop \n
       if(chdir(buf+3) < 0)
@@ -184,10 +195,13 @@ main(void)
       }
       continue;
     }
-    else{
-      addHist(buf);
-      printf(2, "History: %s\n", history[0]);
+
+    if(strcmp(buf, "cls\n") == 0){
+      printf(1, "\033[2J\033[1;1H\n");
+      continue;
     }
+
+    addHist(buf);
 
     if(fork1() == 0){
       runcmd(parsecmd(buf));
