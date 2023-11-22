@@ -60,7 +60,7 @@ runcmd(struct cmd *cmd)
   //int p[2];
   //struct backcmd *bcmd;
   struct execcmd *ecmd;
-  //struct listcmd *lcmd;
+  struct listcmd *lcmd;
   //struct pipecmd *pcmd;
   //struct redircmd *rcmd;
   
@@ -84,7 +84,16 @@ runcmd(struct cmd *cmd)
     break;
 
   case LIST:
-    printf(2, "List Not Implemented\n");
+    lcmd = (struct listcmd*)cmd;
+    int fstatus = fork1();
+    if(fstatus == -1) {
+      printf(2, "fork failed\n");
+      exit();
+    }
+    if(fstatus == 0) 
+      runcmd(lcmd->left);
+    wait();
+    runcmd(lcmd->right);
     break;
 
   case PIPE:
