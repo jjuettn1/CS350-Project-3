@@ -13,6 +13,8 @@
 
 #define MAXARGS 10
 
+char* history[10];
+
 struct cmd {
   int type;
 };
@@ -117,6 +119,42 @@ getcmd(char *buf, int nbuf)
 }
 
 int
+hist(char *buf, int nbuf){
+  if (strcmp(buf, "print") == 0)
+  {
+    for(int i = 0; i < 10; i++){
+      if((history[i]) != 0){
+      printf(2, "Previous command %d: %s\n", i+1, history[i]);
+      }
+    }
+    return 1;
+  }
+  else if (nbuf == 1)
+  {
+    int val=atoi(buf)-1;
+    if(val >= 0 && val < 10){
+      if(fork1() == 0){
+      printf(2, "%s\n" , history[val]);
+      runcmd(parsecmd(history[val]));
+      }
+      wait();
+    }
+    return 1;
+  }
+  
+  return 0;
+}
+
+void
+addHist(char *buf){
+  // for (int i = 9; i > 0; i--)
+  // {
+  //   history[i]=history[i-1];
+  // }
+  history[0]=buf;
+}
+
+int
 main(void)
 {
   static char buf[100];
@@ -139,8 +177,21 @@ main(void)
         printf(2, "cannot cd %s\n", buf+3);
       continue;
     }
-    if(fork1() == 0)
+    if(buf[0] == 'h' && buf[1] == 'i' && buf[2] == 's' && buf[3] == 't' && buf[4] == ' '){
+      buf[strlen(buf)-1] = 0;
+      if(!hist(buf+5, strlen(buf+5))){
+        printf(2, "Error: Hist Failed\n");
+      }
+      continue;
+    }
+    else{
+      addHist(buf);
+      printf(2, "History: %s\n", history[0]);
+    }
+
+    if(fork1() == 0){
       runcmd(parsecmd(buf));
+    }
     wait();
   }
   exit();
