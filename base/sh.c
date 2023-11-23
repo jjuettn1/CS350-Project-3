@@ -15,6 +15,8 @@
 
 int pipeCount = 0;
 
+char* history[10] = {0};
+
 struct cmd {
   int type;
 };
@@ -55,16 +57,62 @@ int fork1(void);  // Fork but panics on failure.
 void panic(char*);
 struct cmd *parsecmd(char*);
 
+
+int
+hist(char *buf, int nbuf){
+  if (strcmp(buf, "print") == 0)
+    {
+      for(int i = 0; i < 10; i++){
+	if((history[i]) != 0){
+	  printf(2, "Previous command %d: %s", i+1, history[i]);
+	}
+      }
+      return 1;
+    }
+  else if (nbuf == 2 || nbuf == 1)
+    {
+      int val=atoi(buf)-1;
+      if(val >= 0 && val < 10){
+	if(fork1() == 0){
+	  runcmd(parsecmd(history[val]));
+	}
+	wait();
+      }
+      else{
+	printf(2, "Error: Only storing 10 previous commands");
+      }
+      return 1;
+    }
+
+  return 0;
+}
+
+void
+addHist(char *buf){
+  //code to shift values of the history array to update the list with recent commands
+
+  if(history[9] != 0){
+    free(history[9]);
+  }
+
+  for(int i = 9; i > 0; i--) {
+    history[i] = history[i - 1];
+  }
+  history[0] = malloc(strlen(buf) + 1);
+  strcpy(history[0], buf);
+
+}
+
 // Execute cmd.  Never returns.
 void
 runcmd(struct cmd *cmd)
 {
   //int p[2];
-  //struct backcmd *bcmd;
+  struct backcmd *bcmd;
   struct execcmd *ecmd;
-  //struct listcmd *lcmd;
   struct pipecmd *pcmd;
-  //struct redircmd *rcmd;
+  struct listcmd *lcmd;
+  struct redircmd *rcmd;
   
   if(cmd == 0)
     exit();
@@ -78,16 +126,40 @@ runcmd(struct cmd *cmd)
     ecmd = (struct execcmd*)cmd;
     if(ecmd->argv[0] == 0)
       exit();
-    exec(ecmd->argv[0], ecmd->argv);
-    printf(2, "exec %s failed\n", ecmd->argv[0]);
+    
+    if(strcmp(ecmd->argv[0], "hist") == 0){
+      if(!hist(ecmd->argv[1], strlen(ecmd->argv[1]))){
+	printf(2, "Error: Hist Failed\n");
+      } 
+    }
+    else{
+      exec(ecmd->argv[0], ecmd->argv);
+      printf(2, "exec %s failed\n", ecmd->argv[0]);
+    }
     break;
 
   case REDIR:
-    printf(2, "Redirection Not Implemented\n");
+    rcmd = (struct redircmd*)cmd;
+    close(rcmd->fd);
+    int file_open_result = open(rcmd->file, rcmd->mode);
+    if (file_open_result < 0) {
+      printf("Error: Failed to open %s\n", rcmd->file);
+      exit();
+    }
+    runcmd(rcmd->cmd);
     break;
 
   case LIST:
-    printf(2, "List Not Implemented\n");
+    lcmd = (struct listcmd*)cmd;
+    int fstatus = fork1();
+    if(fstatus == -1) {
+      printf(2, "fork failed\n");
+      exit();
+    }
+    if(fstatus == 0) 
+      runcmd(lcmd->left);
+    wait();
+    runcmd(lcmd->right);
     break;
 
   case PIPE:
@@ -126,8 +198,13 @@ runcmd(struct cmd *cmd)
     break;
 
   case BACK:
-    printf(2, "Backgrounding not implemented\n");
+    //printf(2, "Backgrounding not implemented\n");
+    bcmd = (struct backcmd*)cmd;
+    if(fork1() == 0){
+      runcmd(bcmd->cmd);
+    }
     break;
+
   }
   exit();
 }
@@ -142,6 +219,7 @@ getcmd(char *buf, int nbuf)
     return -1;
   return 0;
 }
+
 
 int
 main(void)
@@ -159,15 +237,28 @@ main(void)
 
   // Read and run input commands.
   while(getcmd(buf, sizeof(buf)) >= 0){
+  
     if(buf[0] == 'c' && buf[1] == 'd' && buf[2] == ' '){
+      addHist(buf);
       // Chdir must be called by the parent, not the child.
       buf[strlen(buf)-1] = 0;  // chop \n
       if(chdir(buf+3) < 0)
         printf(2, "cannot cd %s\n", buf+3);
       continue;
     }
-    if(fork1() == 0)
+    
+    if(!(buf[0] == 'h' && buf[1] == 'i' && buf[2] == 's' && buf[3] == 't' && buf[4] == ' ')){
+      addHist(buf);
+    }
+   
+    if(strcmp(buf, "cls\n") == 0){
+      printf(1, "\033[2J\033[1;1H\n");
+      continue;
+    }
+
+    if(fork1() == 0){
       runcmd(parsecmd(buf));
+    }
     wait();
   }
   exit();
@@ -259,6 +350,7 @@ backcmd(struct cmd *subcmd)
   cmd->cmd = subcmd;
   return (struct cmd*)cmd;
 }
+
 //PAGEBREAK!
 // Parsing
 
@@ -491,6 +583,7 @@ nulterminate(struct cmd *cmd)
     bcmd = (struct backcmd*)cmd;
     nulterminate(bcmd->cmd);
     break;
+    
+    return cmd;
   }
-  return cmd;
 }
