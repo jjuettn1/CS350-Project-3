@@ -13,6 +13,8 @@
 
 #define MAXARGS 10
 
+int pipeCount = 0;
+
 char* history[10] = {0};
 
 struct cmd {
@@ -108,14 +110,15 @@ runcmd(struct cmd *cmd)
   //int p[2];
   struct backcmd *bcmd;
   struct execcmd *ecmd;
+  struct pipecmd *pcmd;
   struct listcmd *lcmd;
-  //struct pipecmd *pcmd;
   struct redircmd *rcmd;
   
   if(cmd == 0)
     exit();
 
   switch(cmd->type){
+    
   default:
     panic("runcmd");
 
@@ -160,7 +163,38 @@ runcmd(struct cmd *cmd)
     break;
 
   case PIPE:
-    printf(2, "Pipe Not implemented\n");
+
+  pcmd = (struct pipecmd*)cmd;
+  
+    int fds[2];
+    int ret = 0;
+    pipe(fds);
+    int pid1, pid2;
+    
+    pid1 = fork();
+    if(pid1==0){
+      close(1);
+      dup(fds[1]);
+      close(fds[0]);
+      ecmd = (struct execcmd*)pcmd->left;
+      runcmd(ecmd);
+      exit();
+    }
+    pid2 = fork();
+    if(pid2==0){
+      close(0);
+      dup(fds[0]);
+      close(fds[1]);
+      struct execcmd *ecmd2 = (struct execcmd*)pcmd->right;
+      runcmd(ecmd2);
+    }
+    else{
+      while ((ret = wait()) > 0){
+        close(fds[0]);
+        close(fds[1]);
+      }
+    }
+
     break;
 
   case BACK:
@@ -288,6 +322,7 @@ pipecmd(struct cmd *left, struct cmd *right)
   cmd->type = PIPE;
   cmd->left = left;
   cmd->right = right;
+ 
   return (struct cmd*)cmd;
 }
 
@@ -405,8 +440,8 @@ struct cmd*
 parseline(char **ps, char *es)
 {
   struct cmd *cmd;
-
   cmd = parsepipe(ps, es);
+  
   while(peek(ps, es, "&")){
     gettoken(ps, es, 0, 0);
     cmd = backcmd(cmd);
@@ -422,9 +457,9 @@ struct cmd*
 parsepipe(char **ps, char *es)
 {
   struct cmd *cmd;
-
   cmd = parseexec(ps, es);
   if(peek(ps, es, "|")){
+    pipeCount++;
     gettoken(ps, es, 0, 0);
     cmd = pipecmd(cmd, parsepipe(ps, es));
   }
