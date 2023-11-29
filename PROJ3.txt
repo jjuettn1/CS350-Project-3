@@ -1,0 +1,6 @@
+
+How we worked on the project:
+  We split the project into 5 parts with the first 4 being assigned to each member 
+  of the group and the final part we all worked on together. Aubrey worked on command chaining, Hamilton
+  worked on redirecting commands outputs to a file, Griff worked on pipelining and Jake worked on background
+  execution. Finally we all worked together to implement the history command. 
